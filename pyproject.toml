@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 180
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["services", "shared"]

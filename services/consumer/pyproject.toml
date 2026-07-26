@@ -1,0 +1,16 @@
+[project]
+name = "consumer"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "aioboto3>=13.0",
+    "pyarrow>=16.0",
+    "analytics-platform-shared",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/consumer"]

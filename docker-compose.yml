@@ -1,0 +1,69 @@
+services:
+  floci:
+    image: floci/floci:latest
+    ports:
+      - "4566:4566"
+    environment:
+      - FLOCI_SERVICES=kinesis,s3,glue,athena,eventbridge,cloudwatch,iam
+    volumes:
+      - floci-data:/var/lib/floci
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_floci/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ingestion:
+    build:
+      context: .
+      dockerfile: services/ingestion/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV=local
+      - AWS_ENDPOINT_URL=http://floci:4566
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - KINESIS_STREAM_NAME=events
+    depends_on:
+      floci:
+        condition: service_healthy
+
+  consumer:
+    build:
+      context: .
+      dockerfile: services/consumer/Dockerfile
+    environment:
+      - ENV=local
+      - AWS_ENDPOINT_URL=http://floci:4566
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - KINESIS_STREAM_NAME=events
+      - S3_BUCKET=analytics-lake
+    depends_on:
+      floci:
+        condition: service_healthy
+
+  serving:
+    build:
+      context: .
+      dockerfile: services/serving/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - ENV=local
+      - AWS_ENDPOINT_URL=http://floci:4566
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - S3_BUCKET=analytics-lake
+      - ATHENA_DATABASE=analytics
+      - ATHENA_OUTPUT=s3://analytics-lake/athena-results/
+    depends_on:
+      floci:
+        condition: service_healthy
+
+volumes:
+  floci-data:

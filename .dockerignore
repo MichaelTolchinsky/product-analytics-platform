@@ -1,0 +1,36 @@
+# Git
+.git/
+.gitignore
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+**/dist/
+**/build/
+**/.eggs/
+**/.venv/
+**/venv/
+
+# Testing / lint
+**/.pytest_cache/
+**/.coverage
+**/htmlcov/
+**/.ruff_cache/
+
+# CDK
+infra/cdk.out/
+infra/.cdk.staging/
+
+# Local env
+.env
+.env.*
+
+# IDE / OS
+.idea/
+.vscode/
+**/*.swp
+.DS_Store
+
+# Docs / readme
+README.md
