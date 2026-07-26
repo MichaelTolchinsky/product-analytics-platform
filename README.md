@@ -1,19 +1,17 @@
 # Product Analytics Platform
 
-A small streaming analytics platform that ingests product events, stores them
-efficiently in a Data Lake, and exposes analytical queries. The focus is on
-**data engineering concepts**.
+An end-to-end streaming analytics platform: product events flow through
+Kinesis, land as partitioned Parquet in a Data Lake, and get served back as
+analytics. Built to demonstrate core **data engineering concepts** — streaming
+ingestion, medallion architecture, columnar storage, partitioning — rather
+than another CRUD app.
 
 ## Goal
 
-Build an end-to-end pipeline that streams product events, lands them as
-partitioned Parquet in a Data Lake, and serves analytics over the historical
-data — while measuring the impact of Parquet, partitioning, and batching.
-
-## Scope
-
-- **Target completion:** 3–5 days
-- **Budget:** ~$30–50 total estimated (Kinesis has no free tier: ~$0.015/shard-hr; ALB ~$0.008/LCU-hr; S3/Athena near-free at this scale). Tear down after experiments.
+Stream product events end-to-end and **measure** how much Parquet,
+partitioning, and batching actually improve query performance and cost —
+then serve the results as real analytics endpoints (DAU, top pages,
+conversion, and more).
 
 ## Versions
 

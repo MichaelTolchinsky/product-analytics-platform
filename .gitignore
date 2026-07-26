@@ -30,6 +30,9 @@ infra/.cdk.staging/
 .env.*
 !.env.example
 
+# Internal-only notes, never pushed
+internal-readme.md
+
 # OS
 .DS_Store
 Thumbs.db
