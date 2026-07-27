@@ -6,7 +6,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from ingestion.api.schemas import EventAccepted
 from ingestion.domain.service import IngestionService
 
-router = APIRouter()
+router = APIRouter(tags=["Events"])
 
 
 def get_ingestion_service(request: Request) -> IngestionService:
@@ -17,6 +17,8 @@ def get_ingestion_service(request: Request) -> IngestionService:
     "/events",
     response_model=EventAccepted,
     status_code=status.HTTP_202_ACCEPTED,
+    summary="Ingest an event",
+    description="Validates and publishes a single product event to the stream. Returns 202 if accepted, 400 if the payload fails schema validation.",
 )
 async def ingest_event(
     raw: Annotated[dict[str, Any], Body()],

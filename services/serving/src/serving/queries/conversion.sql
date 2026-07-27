@@ -1,0 +1,3 @@
+SELECT converted_sessions, total_signup_sessions, conversion_rate_pct
+FROM gold_conversion
+LIMIT 1

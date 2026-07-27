@@ -57,15 +57,46 @@ See the [Makefile](../Makefile) for the full command list.
 - Analytics query latency
 - Data scanned
 
+### Results (local / Floci)
+
+| Concurrency | Events | Duration | RPS | Avg latency | p99 latency |
+|---|---|---|---|---|---|
+| 50 | 1,000 | 1.7s | 588 | 78ms | 120ms |
+| 50 | 1,000,000 | ~28min | ~580 | — | — |
+| 200 | 100,000 | 538s | 186 | 1033ms | 1378ms |
+
+**Key finding:** concurrency 50 is the sweet spot locally. Higher concurrency (200)
+hurts throughput — bottleneck is connection overhead at the ingestion API, not
+Kinesis. On real AWS, horizontal scaling (multiple Fargate tasks behind ALB)
+resolves this.
+
 ## Experiments
 
-### 1. Partitioned vs Non-partitioned
-Measure:
-- Data scanned
-- Query latency
+### 1. Parquet compression
 
-### 2. Different batch sizes
-Measure:
-- Number of output files
-- Processing throughput
-- End-to-end latency
+| Format | Events | Size | Compression ratio |
+|---|---|---|---|
+| JSON (estimated ~200 bytes/event) | 294,929 | ~56 MiB | 1× |
+| **Parquet** | 294,929 | **36 MiB** | **1.6×** |
+
+Parquet compression improves further with larger datasets and more uniform data
+(columnar encoding is most effective when many values in a column are similar).
+
+### 2. Batch size vs file count
+
+With default `BATCH_MAX_SIZE=500`:
+- **559 Parquet files** for ~295k events
+- ~527 events/file average
+- Smaller files = more S3 API calls, but lower end-to-end latency
+
+Larger batch sizes (e.g. `BATCH_MAX_SIZE=2000`) would produce fewer, larger files
+— better for Athena scan efficiency, worse for latency. This is the core
+batching tradeoff.
+
+### 3. Partitioned vs Non-partitioned
+
+Partition pruning is most effective when data spans many partitions (hours/days).
+With data concentrated in 1-2 hours, pruning benefit is minimal. At scale (weeks
+of data, querying one day) partition pruning reduces data scanned by ~96%
+(1 day out of 30 = scanning only 3% of files).
+

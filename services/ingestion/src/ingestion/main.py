@@ -29,7 +29,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Ingestion API", lifespan=lifespan)
+    app = FastAPI(
+        title="Ingestion API",
+        description="Accepts and validates product events, publishes them to the stream.",
+        version="1.0.0",
+        lifespan=lifespan,
+    )
     app.include_router(router)
     return app
 

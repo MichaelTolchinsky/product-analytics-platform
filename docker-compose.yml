@@ -7,6 +7,7 @@ services:
       - FLOCI_SERVICES=kinesis,s3,glue,athena,eventbridge,cloudwatch,iam
     volumes:
       - floci-data:/var/lib/floci
+      - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4566/_floci/health"]
       interval: 5s
@@ -24,7 +25,8 @@ services:
       - AWS_ENDPOINT_URL=http://floci:4566
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
-      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_DEFAULT_REGION=eu-north-1
+      - AWS_REGION=eu-north-1
       - KINESIS_STREAM_NAME=events
     depends_on:
       floci:
@@ -39,7 +41,8 @@ services:
       - AWS_ENDPOINT_URL=http://floci:4566
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
-      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_DEFAULT_REGION=eu-north-1
+      - AWS_REGION=eu-north-1
       - KINESIS_STREAM_NAME=events
       - S3_BUCKET=analytics-lake
     depends_on:
@@ -57,7 +60,8 @@ services:
       - AWS_ENDPOINT_URL=http://floci:4566
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
-      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_DEFAULT_REGION=eu-north-1
+      - AWS_REGION=eu-north-1
       - S3_BUCKET=analytics-lake
       - ATHENA_DATABASE=analytics
       - ATHENA_OUTPUT=s3://analytics-lake/athena-results/
