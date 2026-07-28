@@ -1,38 +1,62 @@
 # Product Analytics Platform
 
 An end-to-end streaming analytics platform: product events flow through
-Kinesis, land as partitioned Parquet in a Data Lake, and get served back as
-analytics. Built to demonstrate core **data engineering concepts** — streaming
-ingestion, medallion architecture, columnar storage, partitioning — rather
-than another CRUD app.
+Kinesis, land as partitioned Parquet in a data lake, and get served back as
+live analytics. Built to demonstrate core **data engineering** concepts —
+streaming ingestion, medallion architecture, columnar storage, partitioning,
+and a two-tier serving layer — rather than another CRUD app.
 
-## Goal
+## What it does
 
-Stream product events end-to-end and **measure** how much Parquet,
-partitioning, and batching actually improve query performance and cost —
-then serve the results as real analytics endpoints (DAU, top pages,
-conversion, and more).
+```
+POST /events  →  Kinesis  →  Consumer  →  S3 (bronze Parquet)
+                                              ↓  Athena jobs (hourly)
+                                           silver (deduped + typed)
+                                              ↓  Athena jobs (hourly)
+                                            gold (precomputed metrics)
+                                              ↓
+GET /metrics/*  ←  DynamoDB cache  ←  Analytics API  →  Athena / Redshift
+```
 
-## Versions
+## Scope
 
-The project is delivered in two milestones.
+Everything in this repo is **fully implemented and runs locally** via Docker
+Compose + Floci (a free, MIT-licensed local AWS emulator).
 
-### v1 — Streaming lake + medallion (current scope)
-- Ingestion → Kinesis → processing → **bronze** (raw Parquet) → **silver** (clean)
-- Glue Data Catalog + Athena for **ad-hoc** and **scheduled aggregation** into gold
-- Analytics API serves precomputed **gold** metrics on-demand
-- Load generator + the Parquet / partitioning / batching experiments
-- No warehouse, no frontend
+| Layer | What's built |
+|---|---|
+| **Ingestion** | FastAPI service — validates events, publishes to Kinesis |
+| **Consumer** | Long-running service — batches events, writes partitioned Parquet to S3 |
+| **Jobs** | Athena SQL — bronze → silver (dedupe, type), silver → gold (DAU, top pages, conversion, searches, event counts) |
+| **Analytics API** | FastAPI service — serves gold metrics; DynamoDB cache-aside; Athena or Redshift engine swappable via one line |
+| **Load generator** | Async Python — simulates realistic user sessions, reports RPS + latency |
+| **Infra (CDK)** | 6 stacks: VPC, S3/Kinesis/Glue/Athena, Redshift Serverless + DynamoDB, ECS Fargate + ALB, EventBridge scheduler, GitHub Actions OIDC deploy role |
+| **CI/CD** | GitHub Actions — lint → build → push to ECR → force-deploy ECS → wait stable; OIDC auth, no stored AWS keys |
 
-### v2 — Warehouse serving + dashboard (future)
-- Add **Redshift (Serverless)** as the gold/marts serving tier
-- **Materialized-view** pattern: scheduled refresh of curated marts in Redshift
-- Optional **serving cache** (DynamoDB/Redis) in front of Redshift for low-latency reads
-- A simple **UI / dashboard** on top of the analytics API
+## Project layout
+
+```
+services/
+  ingestion/      — FastAPI: validates events, publishes to Kinesis
+  consumer/       — Long-running: reads Kinesis, writes Parquet to S3
+  analytics-api/  — FastAPI: serves gold metrics, Athena/Redshift engines
+  load_gen/       — Async load generator
+
+shared/           — Shared event schema + base settings (imported by all services)
+
+jobs/
+  silver/         — Athena SQL: bronze → silver (dedupe, type)
+  gold/           — Athena SQL: silver → gold (DAU, top pages, etc.)
+  redshift/       — Redshift TRUNCATE + COPY: gold → mart tables
+
+infra/            — CDK stacks (VPC, lake, stream, compute, scheduler, pipeline)
+scripts/          — Local bootstrap (creates Kinesis stream, S3 bucket, Glue tables)
+dashboard/        — Static HTML + Chart.js served by Analytics API
+```
 
 ## Documentation
 
-- **[Architecture](docs/ARCHITECTURE.md)** — requirements, event model, data lake
-  layout, system flows, component diagram, failure & recovery, success criteria
-- **[Development](docs/DEVELOPMENT.md)** — tech stack, local dev setup (Floci),
-  load testing, experiments
+- **[Architecture](docs/ARCHITECTURE.md)** — event model, data lake layout,
+  system flows, component diagram, failure & recovery, design decisions
+- **[Development](docs/DEVELOPMENT.md)** — local setup, load testing,
+  experiments (Parquet compression, batch size, partition pruning)

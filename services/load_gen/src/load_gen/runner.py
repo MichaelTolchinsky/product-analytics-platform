@@ -5,7 +5,7 @@ Tracks throughput, latency, and rejection stats.
 
 Usage:
     python -m load_gen.runner
-    TOTAL_EVENTS=1000000 CONCURRENCY=100 python -m load_gen.runner
+    TOTAL_EVENTS=1000000 CONCURRENCY=500 python -m load_gen.runner
 """
 
 import asyncio
@@ -18,8 +18,11 @@ import httpx
 from load_gen.config import LoadGenSettings
 from load_gen.generator import make_event, make_session
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s %(message)s")
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 
 @dataclass
@@ -51,16 +54,15 @@ class Stats:
         )
 
 
-async def send_event(
+async def send_one(
     client: httpx.AsyncClient,
     url: str,
     stats: Stats,
     semaphore: asyncio.Semaphore,
 ) -> None:
-    """Send one event, record result in stats."""
+    """Send one event — flat pool, all truly concurrent."""
     user_id, session_id = make_session()
-    event = make_event(user_id, session_id)
-    payload = event.model_dump(mode="json")
+    payload = make_event(user_id, session_id).model_dump(mode="json")
 
     async with semaphore:
         start = time.monotonic()
@@ -72,54 +74,34 @@ async def send_event(
             logger.warning("request error: %s", exc)
 
 
-async def run_session(
-    client: httpx.AsyncClient,
-    url: str,
-    stats: Stats,
-    semaphore: asyncio.Semaphore,
-    events_per_session: int,
-) -> None:
-    """Send a sequence of events for one simulated user session."""
-    user_id, session_id = make_session()
-
-    for _ in range(events_per_session):
-        event = make_event(user_id, session_id)
-        payload = event.model_dump(mode="json")
-
-        async with semaphore:
-            start = time.monotonic()
-            try:
-                response = await client.post(url, json=payload)
-                stats.record(response.status_code, time.monotonic() - start)
-            except httpx.RequestError as exc:
-                stats.failed += 1
-                logger.warning("request error: %s", exc)
-
-
 async def run() -> None:
     settings = LoadGenSettings()
     url = f"{settings.ingestion_url}/events"
     semaphore = asyncio.Semaphore(settings.concurrency)
     stats = Stats()
 
-    sessions = settings.total_events // settings.events_per_session
-
-    logger.info(
-        "starting load test: %d events across %d sessions, concurrency=%d → %s",
-        settings.total_events, sessions, settings.concurrency, url,
+    logger.warning(
+        "starting load test: %d events, concurrency=%d → %s",
+        settings.total_events, settings.concurrency, url,
     )
 
     start = time.monotonic()
 
     async with httpx.AsyncClient(timeout=10.0) as client:
-        tasks = [
-            run_session(client, url, stats, semaphore, settings.events_per_session)
-            for _ in range(sessions)
-        ]
-        await asyncio.gather(*tasks)
+        # Progress log every 100k events
+        chunk = 100_000
+        for batch_start in range(0, settings.total_events, chunk):
+            batch_size = min(chunk, settings.total_events - batch_start)
+            tasks = [
+                send_one(client, url, stats, semaphore)
+                for _ in range(batch_size)
+            ]
+            await asyncio.gather(*tasks)
+            elapsed = time.monotonic() - start
+            print(f"  {stats.sent:>9,} / {settings.total_events:,}  rps={stats.sent/elapsed:,.0f}")
 
     elapsed = time.monotonic() - start
-    logger.info("done in %.1fs — %s", elapsed, stats.summary(elapsed))
+    print(f"\ndone in {elapsed:.1f}s — {stats.summary(elapsed)}")
 
 
 if __name__ == "__main__":

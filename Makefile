@@ -1,4 +1,4 @@
-.PHONY: up down build test lint load-test setup setup-shared setup-ingestion setup-consumer setup-analytics-api setup-load-gen bootstrap jobs-local jobs flush-cache
+.PHONY: up down build test lint load-test load-test-1m setup setup-shared setup-ingestion setup-consumer setup-analytics-api setup-load-gen bootstrap jobs-local jobs flush-cache
 
 ## Local dev
 up:
@@ -62,7 +62,10 @@ lint-fix:
 
 ## Load testing
 load-test:
-	uv run python -m load_gen.runner
+	TOTAL_EVENTS=100000 CONCURRENCY=200 uv run python -m load_gen.runner
+
+load-test-1m:
+	TOTAL_EVENTS=1000000 CONCURRENCY=200 uv run python -m load_gen.runner
 
 ## Jobs (local — DuckDB direct, bypasses Athena)
 jobs-local:

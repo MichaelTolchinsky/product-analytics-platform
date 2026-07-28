@@ -1,102 +1,108 @@
 # Development
 
-Local dev setup, testing, and experiments for the [Product Analytics Platform](../README.md).
+Local setup and load testing for the Product Analytics Platform.
 For system design, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
-## Tech Stack
+## Prerequisites
 
-- Python
-- FastAPI
-- PyArrow
-- aioboto3
-- AWS CDK
-- GitHub Actions
-- Floci (local AWS emulation)
+- [Docker](https://docs.docker.com/get-docker/) — runs Floci + services
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) — Python package manager
 
-## Local Development
+No AWS account needed. Everything runs locally against **Floci**, a free
+MIT-licensed AWS emulator with a real DuckDB backend for Athena.
 
-All v1 (and v2) development runs locally against **Floci** — a free, MIT-licensed
-local AWS emulator — to avoid Kinesis/ALB costs until ready to deploy.
-
-| Component | Local replacement |
-| --------- | ----------------- |
-| Kinesis, S3, Glue, Athena, EventBridge, CloudWatch | **Floci** (`http://localhost:4566`) |
-| Ingestion API, Consumer, Serving API | Docker Compose (same images as Fargate) |
-| CDK deployment | `cdk deploy` pointed at Floci endpoint |
-
-**Why Floci over LocalStack:** Athena runs via a real DuckDB backend (not a
-stub), so `CTAS`/`INSERT OVERWRITE` queries work on free tier — exactly what the
-silver and gold jobs use. Fully free, no account or token required, ~24ms startup.
-
-**Zero code changes** between local and real AWS — all boto3/aioboto3 calls route
-through `AWS_ENDPOINT_URL=http://localhost:4566` when set; unset = real AWS.
-
-### Commands
+## Quickstart
 
 ```bash
-make setup   # install all services locally (editable mode, for IDE support)
-make up      # start Floci + all services via Docker Compose
-make test    # run pytest across all services
-make lint    # ruff check + format check
+make up
 ```
 
-See the [Makefile](../Makefile) for the full command list.
+This single command:
 
-## Load Testing
+1. Starts Floci (local AWS — Kinesis, S3, Glue, Athena, DynamoDB)
+2. Creates all AWS resources (stream, bucket, Glue tables, DynamoDB cache)
+3. Starts the Ingestion API and Consumer via Docker Compose
+4. Sends **5,000 events** through the full pipeline as a smoke test
+5. Runs the Athena jobs: bronze → silver → gold
+6. Starts the Analytics API
 
-**Generate:**
-- 100k–1M events
-- Multiple concurrent users
-- Random sessions / pages
+Once complete, the stack is fully live:
 
-**Measure:**
-- API throughput
-- Stream throughput
-- Processing throughput
-- End-to-end ingestion latency
-- Analytics query latency
-- Data scanned
+| Service | URL |
+|---|---|
+| Ingestion API | <http://localhost:8000> |
+| Analytics API | <http://localhost:8001> |
+| API docs (Ingestion) | <http://localhost:8000/docs> |
+| API docs (Analytics) | <http://localhost:8001/docs> |
+| Dashboard | <http://localhost:8001> |
 
-### Results (local / Floci)
+## Try it
 
-| Concurrency | Events | Duration | RPS | Avg latency | p99 latency |
-|---|---|---|---|---|---|
-| 50 | 1,000 | 1.7s | 588 | 78ms | 120ms |
-| 50 | 1,000,000 | ~28min | ~580 | — | — |
-| 200 | 100,000 | 538s | 186 | 1033ms | 1378ms |
+**Send a single event:**
 
-**Key finding:** concurrency 50 is the sweet spot locally. Higher concurrency (200)
-hurts throughput — bottleneck is connection overhead at the ingestion API, not
-Kinesis. On real AWS, horizontal scaling (multiple Fargate tasks behind ALB)
-resolves this.
+```bash
+curl -s -X POST http://localhost:8000/events \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id": "test-001",
+    "event_type": "page_view",
+    "timestamp": "2024-01-15T10:00:00Z",
+    "user_id": "user-123",
+    "session_id": "sess-abc",
+    "page": "/products",
+    "metadata": {}
+  }' | jq
+```
 
-## Experiments
+**Query a metric:**
 
-### 1. Parquet compression
+```bash
+curl -s http://localhost:8001/metrics/dau | jq
+curl -s http://localhost:8001/metrics/top-pages | jq
+curl -s http://localhost:8001/metrics/conversion | jq
+```
 
-| Format | Events | Size | Compression ratio |
-|---|---|---|---|
-| JSON (estimated ~200 bytes/event) | 294,929 | ~56 MiB | 1× |
-| **Parquet** | 294,929 | **36 MiB** | **1.6×** |
+**Run jobs manually** (rebuild silver + gold from current bronze):
 
-Parquet compression improves further with larger datasets and more uniform data
-(columnar encoding is most effective when many values in a column are similar).
+```bash
+make jobs-local
+```
 
-### 2. Batch size vs file count
+## Load testing
 
-With default `BATCH_MAX_SIZE=500`:
-- **559 Parquet files** for ~295k events
-- ~527 events/file average
-- Smaller files = more S3 API calls, but lower end-to-end latency
+The load generator simulates realistic user sessions — weighted event types
+(60% page views, 20% clicks, 10% searches, 5% signups, 5% purchases) across
+random users, sessions, and pages.
 
-Larger batch sizes (e.g. `BATCH_MAX_SIZE=2000`) would produce fewer, larger files
-— better for Athena scan efficiency, worse for latency. This is the core
-batching tradeoff.
+**Quick run (10k events):**
 
-### 3. Partitioned vs Non-partitioned
+```bash
+TOTAL_EVENTS=10000 CONCURRENCY=500 uv run python -m load_gen.runner
+```
 
-Partition pruning is most effective when data spans many partitions (hours/days).
-With data concentrated in 1-2 hours, pruning benefit is minimal. At scale (weeks
-of data, querying one day) partition pruning reduces data scanned by ~96%
-(1 day out of 30 = scanning only 3% of files).
+**Tunable parameters:**
+
+| Variable | Default | Description |
+|---|---|---|
+| `TOTAL_EVENTS` | 100,000 | Total events to send |
+| `CONCURRENCY` | 200 | Max concurrent in-flight requests |
+| `INGESTION_URL` | `http://localhost:8000` | Target ingestion endpoint |
+
+**Output format:**
+
+```
+done in 190.9s — sent=10000 accepted=10000 rejected=0 failed=0 rps=52 avg=9292ms p99=10551ms
+```
+
+## Other commands
+
+```bash
+make down          # stop and remove all containers + volumes
+make build         # rebuild Docker images
+make test          # run pytest
+make lint          # ruff check + format check
+make lint-fix      # auto-fix lint issues
+make flush-cache   # clear DynamoDB metrics cache (forces fresh Athena queries)
+make setup         # install all services in editable mode (for IDE support)
+```
 
