@@ -6,6 +6,7 @@ WORKDIR /app
 
 COPY shared/ ./shared/
 COPY services/serving/ ./service/
+COPY dashboard/ ./dashboard/
 
 RUN uv pip install --system --no-cache ./shared ./service
 

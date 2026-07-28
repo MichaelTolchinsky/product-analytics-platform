@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Analytics</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Product Analytics</h1>
+    <span id="last-updated"></span>
+  </header>
+
+  <main>
+    <section class="card" id="dau-card">
+      <h2>Daily Active Users</h2>
+      <p class="metric" id="dau-value">—</p>
+      <p class="sub" id="dau-date"></p>
+    </section>
+
+    <section class="card" id="conversion-card">
+      <h2>Conversion Rate</h2>
+      <p class="metric" id="conversion-rate">—</p>
+      <p class="sub" id="conversion-sub"></p>
+    </section>
+
+    <section class="card wide" id="events-card">
+      <h2>Events by Type</h2>
+      <canvas id="events-chart"></canvas>
+    </section>
+
+    <section class="card wide" id="top-pages-card">
+      <h2>Top Pages</h2>
+      <canvas id="top-pages-chart"></canvas>
+    </section>
+
+    <section class="card wide" id="searches-card">
+      <h2>Top Searches</h2>
+      <canvas id="searches-chart"></canvas>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

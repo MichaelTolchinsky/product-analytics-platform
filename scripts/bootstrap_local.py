@@ -25,11 +25,12 @@ logger = logging.getLogger(__name__)
 # Config — matches docker-compose.yml env vars
 # ---------------------------------------------------------------------------
 
-ENDPOINT   = "http://localhost:4566"
-REGION     = "eu-north-1"
-BUCKET     = "analytics-lake"
-STREAM     = "events"
-DATABASE   = "analytics"
+ENDPOINT        = "http://localhost:4566"
+REGION          = "eu-north-1"
+BUCKET          = "analytics-lake"
+STREAM          = "events"
+DATABASE        = "analytics"
+CACHE_TABLE     = "metrics-cache"
 
 AWS_CREDS  = {
     "aws_access_key_id":     "test",
@@ -58,6 +59,30 @@ PARTITION_PROJECTION = {
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+async def create_dynamodb_cache_table(client) -> None:
+    """Create the metrics-cache DynamoDB table with native TTL enabled.
+
+    Schema:
+        PK: cache_key (S)
+        TTL attribute: ttl (N) — Floci honours DynamoDB TTL semantics
+    """
+    try:
+        await client.create_table(
+            TableName=CACHE_TABLE,
+            KeySchema=[{"AttributeName": "cache_key", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "cache_key", "AttributeType": "S"}],
+            BillingMode="PAY_PER_REQUEST",
+        )
+        # Enable TTL so Floci (and real DynamoDB) expire stale cache entries
+        await client.update_time_to_live(
+            TableName=CACHE_TABLE,
+            TimeToLiveSpecification={"Enabled": True, "AttributeName": "ttl"},
+        )
+        logger.info("dynamodb table '%s' created with TTL enabled", CACHE_TABLE)
+    except client.exceptions.ResourceInUseException:
+        logger.info("dynamodb table '%s' already exists", CACHE_TABLE)
+
 
 async def create_kinesis_stream(client) -> None:
     try:
@@ -276,9 +301,10 @@ async def bootstrap() -> None:
     session = aioboto3.Session()
 
     async with (
-        session.client("kinesis", **AWS_CREDS) as kinesis,
-        session.client("s3",      **AWS_CREDS) as s3,
-        session.client("glue",    **AWS_CREDS) as glue,
+        session.client("kinesis",  **AWS_CREDS) as kinesis,
+        session.client("s3",       **AWS_CREDS) as s3,
+        session.client("glue",     **AWS_CREDS) as glue,
+        session.client("dynamodb", **AWS_CREDS) as dynamodb,
     ):
         await create_kinesis_stream(kinesis)
         await create_s3_bucket(s3)
@@ -288,6 +314,7 @@ async def bootstrap() -> None:
         for table in GOLD_TABLES:
             await create_or_update_table(glue, table)
         await seed_gold_tables(s3)
+        await create_dynamodb_cache_table(dynamodb)
 
     logger.info("bootstrap complete — local stack is ready")
 
