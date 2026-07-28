@@ -4,7 +4,7 @@ services:
     ports:
       - "4566:4566"
     environment:
-      - FLOCI_SERVICES=kinesis,s3,glue,athena,eventbridge,cloudwatch,iam
+      - FLOCI_SERVICES=kinesis,s3,glue,athena,eventbridge,cloudwatch,iam,dynamodb
     volumes:
       - floci-data:/var/lib/floci
       - /var/run/docker.sock:/var/run/docker.sock
@@ -65,6 +65,9 @@ services:
       - S3_BUCKET=analytics-lake
       - ATHENA_DATABASE=analytics
       - ATHENA_OUTPUT=s3://analytics-lake/athena-results/
+      - DASHBOARD_DIR=/app/dashboard
+    volumes:
+      - ./dashboard:/app/dashboard
     depends_on:
       floci:
         condition: service_healthy
