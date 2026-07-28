@@ -6,61 +6,60 @@
   <title>Daily Active Users</title>
   <style>
     :root {
-      --bg: #13151f;
-      --card: #1c1f2e;
-      --border: #2a2f42;
-      --text: #dde1ee;
-      --muted: #6b7390;
-      --blue: #5b8af5;
-      --purple: #9b72f5;
-      --green: #3ecf8e;
-      --orange: #f5a623;
+      --bg: #13151f; --card: #1c1f2e; --border: #2a2f42;
+      --text: #dde1ee; --muted: #6b7390;
+      --blue: #5b8af5; --purple: #9b72f5; --green: #3ecf8e;
+      --orange: #f5a623; --pink: #f472b6; --cyan: #22d3ee;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
 
     header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: .8rem 1.5rem;
-      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: .8rem 1.5rem; background: var(--card); border-bottom: 1px solid var(--border);
     }
     header h1 { font-size: .95rem; font-weight: 700; }
     #ts { font-size: .72rem; color: var(--muted); }
 
-    main { padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+    main { padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+
+    /* section labels */
+    .section-label {
+      font-size: .62rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--muted); margin-bottom: .25rem;
+      display: flex; align-items: center; gap: .5rem;
+    }
+    .section-label .pill {
+      padding: .1rem .45rem; border-radius: 99px; font-size: .6rem; font-weight: 700;
+    }
+    .pill-redshift { background: rgba(91,138,245,.18); color: var(--blue); }
+    .pill-athena   { background: rgba(245,166,35,.18);  color: var(--orange); }
 
     /* KPI row */
     .kpis { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; }
-    .kpi  {
-      background: var(--card); border: 1px solid var(--border);
-      border-radius: 10px; padding: 1.1rem 1.3rem;
-    }
+    .kpi  { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1.3rem; }
     .kpi .label { font-size: .65rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .4rem; }
     .kpi .val   { font-size: 2.4rem; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
     .kpi .sub   { font-size: .75rem; color: var(--muted); margin-top: .35rem; }
 
-    /* chart cards */
-    .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    .chart-card {
-      background: var(--card); border: 1px solid var(--border);
-      border-radius: 10px; padding: 1.1rem 1.3rem;
-    }
+    /* chart grid */
+    .charts2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1.3rem; }
     .chart-card h2 { font-size: .65rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .9rem; }
-
-    /* bar chart */
-    .bar-row { display: flex; align-items: center; gap: .6rem; margin-bottom: .45rem; font-size: .78rem; }
-    .bar-row .name { width: 120px; text-align: right; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
-    .bar-row .bar-wrap { flex: 1; background: rgba(255,255,255,.06); border-radius: 4px; height: 18px; }
-    .bar-row .bar-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
-    .bar-row .count { width: 50px; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; flex-shrink: 0; }
-
-    /* vertical bar chart */
-    .vchart { display: flex; align-items: flex-end; gap: .5rem; height: 140px; margin-bottom: .5rem; }
-    .vchart .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .3rem; }
-    .vchart .col .vbar { width: 100%; border-radius: 4px 4px 0 0; transition: height .4s ease; }
-    .vchart .col .vlabel { font-size: .62rem; color: var(--muted); text-align: center; }
-
     .wide { grid-column: 1/-1; }
+
+    /* horizontal bar */
+    .bar-row { display: flex; align-items: center; gap: .6rem; margin-bottom: .45rem; font-size: .78rem; }
+    .bar-row .name  { width: 120px; text-align: right; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+    .bar-row .bar-wrap { flex: 1; background: rgba(255,255,255,.06); border-radius: 4px; height: 18px; }
+    .bar-row .bar-fill  { height: 100%; border-radius: 4px; }
+    .bar-row .count { width: 52px; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+    /* vertical bar (trend + hourly) */
+    .vchart { display: flex; align-items: flex-end; gap: 4px; height: 130px; }
+    .vchart .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .25rem; justify-content: flex-end; }
+    .vchart .col .vbar { width: 100%; border-radius: 3px 3px 0 0; min-height: 3px; }
+    .vchart .col .vlabel { font-size: .58rem; color: var(--muted); text-align: center; white-space: nowrap; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -69,6 +68,12 @@
   <span id="ts"></span>
 </header>
 <main>
+
+  <!-- KPI row — Redshift pre-computed gold marts -->
+  <div class="section-label">
+    On-demand KPIs
+    <span class="pill pill-redshift">Redshift</span>
+  </div>
   <div class="kpis">
     <div class="kpi">
       <div class="label">Daily Active Users</div>
@@ -87,7 +92,28 @@
     </div>
   </div>
 
-  <div class="charts">
+  <!-- Athena ad-hoc charts — scan silver -->
+  <div class="section-label" style="margin-top:.25rem">
+    Ad-hoc analytics
+    <span class="pill pill-athena">Athena → Silver</span>
+  </div>
+  <div class="charts2">
+    <div class="chart-card">
+      <h2>DAU Trend — Last 7 Days</h2>
+      <div class="vchart" id="dau-trend"></div>
+    </div>
+    <div class="chart-card">
+      <h2>Hourly Events — Today</h2>
+      <div class="vchart" id="hourly-events"></div>
+    </div>
+  </div>
+
+  <!-- Redshift pre-computed breakdowns -->
+  <div class="section-label">
+    Breakdowns
+    <span class="pill pill-redshift">Redshift</span>
+  </div>
+  <div class="charts2">
     <div class="chart-card">
       <h2>Events by Type</h2>
       <div id="events-chart"></div>
@@ -101,19 +127,32 @@
       <div id="searches-chart"></div>
     </div>
   </div>
+
 </main>
 <script>
 const COLORS = ['#5b8af5','#9b72f5','#f472b6','#f5a623','#3ecf8e'];
 
 function hbar(items, labelKey, valueKey, color) {
-  const max = Math.max(...items.map(i => i[valueKey]));
+  const max = Math.max(...items.map(i => Number(i[valueKey])));
   return items.map((item, idx) => {
-    const pct = max > 0 ? (item[valueKey] / max * 100).toFixed(1) : 0;
+    const pct = max > 0 ? (Number(item[valueKey]) / max * 100).toFixed(1) : 0;
     const c = Array.isArray(color) ? color[idx % color.length] : color;
     return `<div class="bar-row">
       <span class="name" title="${item[labelKey]}">${item[labelKey]}</span>
       <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div>
       <span class="count">${Number(item[valueKey]).toLocaleString()}</span>
+    </div>`;
+  }).join('');
+}
+
+function vchart(items, labelKey, valueKey, color) {
+  const MAX_PX = 100;
+  const max = Math.max(...items.map(i => Number(i[valueKey])));
+  return items.map(item => {
+    const px = max > 0 ? Math.max(3, Math.round(Number(item[valueKey]) / max * MAX_PX)) : 3;
+    return `<div class="col">
+      <div class="vbar" style="height:${px}px;background:${color}"></div>
+      <div class="vlabel">${item[labelKey]}</div>
     </div>`;
   }).join('');
 }
@@ -125,10 +164,12 @@ async function get(path) {
 }
 
 async function load() {
-  const [dau, cvr, events, pages, searches] = await Promise.allSettled([
-    get('/metrics/dau'), get('/metrics/conversion'),
-    get('/metrics/events'), get('/metrics/top-pages'), get('/metrics/searches')
-  ]).then(rs => rs.map(r => r.status === 'fulfilled' ? r.value : null));
+  const [dau, cvr, events, pages, searches, trend, hourly] =
+    await Promise.allSettled([
+      get('/metrics/dau'), get('/metrics/conversion'),
+      get('/metrics/events'), get('/metrics/top-pages'), get('/metrics/searches'),
+      get('/analytics/dau-trend?days=7'), get('/analytics/hourly-events'),
+    ]).then(rs => rs.map(r => r.status === 'fulfilled' ? r.value : null));
 
   if (dau) {
     document.getElementById('dau-val').textContent = Number(dau.dau).toLocaleString();
@@ -146,14 +187,20 @@ async function load() {
     document.getElementById('events-chart').innerHTML =
       hbar(events.events, 'event_type', 'count', COLORS);
   }
-  if (pages) {
+  if (pages)
     document.getElementById('pages-chart').innerHTML =
       hbar(pages.pages, 'page', 'views', '#5b8af5');
-  }
-  if (searches) {
+  if (searches)
     document.getElementById('searches-chart').innerHTML =
       hbar(searches.searches, 'query', 'count', '#9b72f5');
-  }
+
+  if (trend && trend.trend.length)
+    document.getElementById('dau-trend').innerHTML =
+      vchart(trend.trend, 'date', 'dau', '#f5a623');
+
+  if (hourly && hourly.events.length)
+    document.getElementById('hourly-events').innerHTML =
+      vchart(hourly.events, 'hour', 'count', '#f5a623');
 
   document.getElementById('ts').textContent = 'Updated ' + new Date().toLocaleTimeString();
 }

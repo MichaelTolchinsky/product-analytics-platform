@@ -41,3 +41,25 @@ class SearchItem(BaseModel):
 
 class SearchesResponse(BaseModel):
     searches: list[SearchItem]
+
+
+# --- Athena ad-hoc analytics schemas ---
+
+class DAUTrendItem(BaseModel):
+    date: date
+    dau: int
+
+
+class DAUTrendResponse(BaseModel):
+    days: int
+    trend: list[DAUTrendItem]
+
+
+class HourlyEventItem(BaseModel):
+    hour: int
+    count: int
+
+
+class HourlyEventsResponse(BaseModel):
+    events: list[HourlyEventItem]
+

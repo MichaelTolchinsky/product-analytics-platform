@@ -9,6 +9,9 @@ GOLD_METRICS = ["dau", "top_pages", "events", "conversion", "searches"]
 class DuckDBEngine:
     """QueryEngine backed by DuckDB — reads Parquet files directly from local S3.
 
+    Registers both gold mart views (for MetricsService / Redshift path locally)
+    and a silver view (for AnalyticsService / Athena path locally).
+
     DuckDB connections are not thread-safe. All queries are serialized through
     an asyncio.Lock so concurrent FastAPI requests don't race on the connection.
     """
@@ -26,7 +29,7 @@ class DuckDBEngine:
             SET s3_secret_access_key='test';
             SET s3_region='{s3_region}';
         """)
-        # Use glob so view registers lazily — no HTTP check at startup.
+        # Gold mart views — lazy glob, no HTTP check at startup
         for metric in GOLD_METRICS:
             self._conn.execute(f"""
                 CREATE OR REPLACE VIEW gold_{metric} AS
@@ -34,6 +37,14 @@ class DuckDBEngine:
                     's3://{s3_bucket}/gold/{metric}/*.parquet'
                 );
             """)
+        # Silver view — used by AnalyticsService (Athena path locally)
+        self._conn.execute(f"""
+            CREATE OR REPLACE VIEW silver AS
+            SELECT * FROM read_parquet(
+                's3://{s3_bucket}/silver/year=*/**/*.parquet',
+                hive_partitioning=true
+            );
+        """)
 
     async def run(self, sql: str) -> list[dict[str, Any]]:
         loop = asyncio.get_running_loop()
