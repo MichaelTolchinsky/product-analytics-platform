@@ -2,8 +2,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 
-from serving.api.schemas import DAUTrendResponse, HourlyEventsResponse
-from serving.domain.analytics_service import AnalyticsService
+from analytics_api.api.schemas import DAUTrendResponse, HourlyEventsResponse
+from analytics_api.domain.analytics_service import AnalyticsService
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 

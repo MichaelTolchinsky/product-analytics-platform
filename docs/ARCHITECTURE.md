@@ -189,7 +189,7 @@ DynamoDB with TTL → return. Right for: endpoints queried a few times per day,
 **Redshift lane** — activate when Athena lane is insufficient.
 Client → Serving API → DynamoDB cache lookup → cache hit: return (~1ms).
 Cache miss: Redshift Data API query over mart tables (~50–200ms) → write to
-DynamoDB with TTL → return. Requires `load_redshift.py` to keep marts in sync
+DynamoDB with TTL → return. Requires `jobs/redshift/load.py` to keep marts in sync
 after each gold job.
 
 **When to switch lanes:**
@@ -210,7 +210,7 @@ captured (throughput, latency, data scanned) to run the partitioning and
 batch-size experiments.
 
 ### 9. Redshift Load Flow (v2)
-After each gold job completes, a loader job (`jobs/load_redshift.py`) runs
+After each gold job completes, a loader job (`jobs/redshift/load.py`) runs
 TRUNCATE + COPY from `s3://analytics-lake/gold/<metric>/` into the matching
 Redshift Serverless mart table. One job per metric, idempotent — safe to re-run.
 EventBridge chains the trigger: gold job completion → load job start.
@@ -454,7 +454,7 @@ flowchart LR
   is high. Engine swap is one line in `main.py`; domain is unchanged.
 - **Redshift Serverless** is the Redshift lane engine. Mart tables are small
   (one row per DAU date / top-N page / etc.) — queries are microsecond column
-  lookups, not scans. Kept in sync by `load_redshift.py` (TRUNCATE + COPY after
+  lookups, not scans. Kept in sync by `jobs/redshift/load.py` (TRUNCATE + COPY after
   each gold job) — only needed when the Redshift lane is active.
 - **DynamoDB cache** sits in front of both lanes. Cache key = metric name +
   serialized query params. TTL per metric: DAU and conversion = 5 min

@@ -3,8 +3,8 @@ from pathlib import Path
 from string import Template
 from typing import Any
 
-from serving.contracts.cache import CacheStore
-from serving.contracts.query_engine import QueryEngine
+from analytics_api.contracts.cache import CacheStore
+from analytics_api.contracts.query_engine import QueryEngine
 
 logger = logging.getLogger(__name__)
 

@@ -6,20 +6,20 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from serving.api.analytics_routes import router as analytics_router
-from serving.api.routes import router as metrics_router
-from serving.config import ServingSettings
-from serving.domain.analytics_service import AnalyticsService
-from serving.domain.service import MetricsService
-from serving.implementation.athena import AthenaEngine
-from serving.implementation.dynamodb_cache import DynamoDBCache
-from serving.implementation.duckdb import DuckDBEngine
-from serving.implementation.redshift import RedshiftEngine
+from analytics_api.api.analytics_routes import router as analytics_router
+from analytics_api.api.routes import router as metrics_router
+from analytics_api.config import AnalyticsApiSettings
+from analytics_api.domain.analytics_service import AnalyticsService
+from analytics_api.domain.service import MetricsService
+from analytics_api.implementation.athena import AthenaEngine
+from analytics_api.implementation.dynamodb_cache import DynamoDBCache
+from analytics_api.implementation.duckdb import DuckDBEngine
+from analytics_api.implementation.redshift import RedshiftEngine
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    settings = ServingSettings()
+    settings = AnalyticsApiSettings()
     session = aioboto3.Session()
 
     if settings.env == "local":
@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 
 def create_app() -> FastAPI:
-    settings = ServingSettings()
+    settings = AnalyticsApiSettings()
     app = FastAPI(
         title="Serving API",
         description=(
@@ -82,6 +82,10 @@ def create_app() -> FastAPI:
     app.include_router(metrics_router)
     app.include_router(analytics_router)
     app.mount("/static", StaticFiles(directory=settings.dashboard_dir), name="static")
+
+    @app.get("/health", include_in_schema=False)
+    async def health() -> dict:
+        return {"status": "ok"}
 
     @app.get("/", include_in_schema=False)
     async def dashboard() -> FileResponse:

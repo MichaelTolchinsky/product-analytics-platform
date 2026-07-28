@@ -1,0 +1,256 @@
+# deploy.yml
+#
+# Triggered on every push to main.
+# Job chain: lint → [test] → build → push → deploy → wait-stable
+#
+# Authentication: OIDC (no long-lived AWS keys stored in GitHub).
+# Required GitHub secret:
+#   AWS_ROLE_ARN  — ARN of the deploy role (printed by `cdk deploy PipelineStack`)
+#
+# One-time setup: cdk deploy --all (see docs/deploy-setup.md)
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write   # required for OIDC token request
+  contents: read
+
+env:
+  AWS_REGION: eu-north-1
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # 1. Lint — ruff check + format on files changed in this push
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install ruff
+        run: uv pip install --system ruff
+
+      - name: Detect changed Python files
+        id: changed
+        run: |
+          BASE=${{ github.event.before }}
+          [ "$BASE" = "0000000000000000000000000000000000000000" ] && BASE="HEAD~1"
+          FILES=$(git diff --name-only "$BASE" HEAD -- '*.py' | tr '\n' ' ')
+          echo "files=$FILES" >> "$GITHUB_OUTPUT"
+
+      - name: Ruff check (lint)
+        if: steps.changed.outputs.files != ''
+        run: ruff check ${{ steps.changed.outputs.files }}
+
+      - name: Ruff format check
+        if: steps.changed.outputs.files != ''
+        run: ruff format --check ${{ steps.changed.outputs.files }}
+
+  # ---------------------------------------------------------------------------
+  # 2. Test — unit tests on affected packages (uncomment when tests exist)
+  # ---------------------------------------------------------------------------
+  # test:
+  #   name: Test
+  #   runs-on: ubuntu-latest
+  #   needs: lint
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+  #
+  #     - uses: astral-sh/setup-uv@v4
+  #
+  #     - name: Install dependencies
+  #       run: uv pip install --system -e shared/ -e services/ingestion/ -e services/consumer/ -e services/analytics-api/ pytest pytest-asyncio
+  #
+  #     - name: Detect changed packages
+  #       id: changed
+  #       run: |
+  #         BASE=${{ github.event.before }}
+  #         [ "$BASE" = "0000000000000000000000000000000000000000" ] && BASE="HEAD~1"
+  #         PATHS=$(git diff --name-only "$BASE" HEAD \
+  #           | grep -E '^(shared|services)/' \
+  #           | sed 's|/src/.*||; s|services/||' \
+  #           | sort -u \
+  #           | xargs -I{} echo "services/{}" \
+  #           | tr '\n' ' ')
+  #         echo "paths=$PATHS" >> "$GITHUB_OUTPUT"
+  #
+  #     - name: Run affected tests
+  #       if: steps.changed.outputs.paths != ''
+  #       run: uv run pytest ${{ steps.changed.outputs.paths }} -x -q
+
+  # ---------------------------------------------------------------------------
+  # 3. Build — docker build for all three images (no push yet)
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ingestion image
+        run: |
+          docker build \
+            -t analytics/ingestion:${{ github.sha }} \
+            -f services/ingestion/Dockerfile \
+            .
+
+      - name: Build consumer image
+        run: |
+          docker build \
+            -t analytics/consumer:${{ github.sha }} \
+            -f services/consumer/Dockerfile \
+            .
+
+      - name: Build analytics-api image
+        run: |
+          docker build \
+            -t analytics/analytics-api:${{ github.sha }} \
+            -f services/analytics-api/Dockerfile \
+            .
+
+  # ---------------------------------------------------------------------------
+  # 4. Push — retag and push to ECR (requires successful build)
+  # ---------------------------------------------------------------------------
+  push:
+    name: Push to ECR
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-push-${{ github.run_id }}
+
+      # Login outputs ${{ steps.ecr-login.outputs.registry }} — the full
+      # registry URL including account ID, with no hardcoding needed.
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push ingestion
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          docker build \
+            -t $REGISTRY/analytics/ingestion:${{ github.sha }} \
+            -t $REGISTRY/analytics/ingestion:latest \
+            -f services/ingestion/Dockerfile \
+            .
+          docker push $REGISTRY/analytics/ingestion:${{ github.sha }}
+          docker push $REGISTRY/analytics/ingestion:latest
+
+      - name: Build and push consumer
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          docker build \
+            -t $REGISTRY/analytics/consumer:${{ github.sha }} \
+            -t $REGISTRY/analytics/consumer:latest \
+            -f services/consumer/Dockerfile \
+            .
+          docker push $REGISTRY/analytics/consumer:${{ github.sha }}
+          docker push $REGISTRY/analytics/consumer:latest
+
+      - name: Build and push analytics-api
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          docker build \
+            -t $REGISTRY/analytics/analytics-api:${{ github.sha }} \
+            -t $REGISTRY/analytics/analytics-api:latest \
+            -f services/analytics-api/Dockerfile \
+            .
+          docker push $REGISTRY/analytics/analytics-api:${{ github.sha }}
+          docker push $REGISTRY/analytics/analytics-api:latest
+
+  # ---------------------------------------------------------------------------
+  # 5. Deploy — force new ECS deployments (requires successful push)
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+    needs: push
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-deploy-${{ github.run_id }}
+
+      - name: Force deploy ingestion
+        run: |
+          aws ecs update-service \
+            --cluster analytics-cluster \
+            --service  ingestion-service \
+            --force-new-deployment \
+            --no-cli-pager
+
+      - name: Force deploy consumer
+        run: |
+          aws ecs update-service \
+            --cluster analytics-cluster \
+            --service  consumer-service \
+            --force-new-deployment \
+            --no-cli-pager
+
+      - name: Force deploy analytics-api
+        run: |
+          aws ecs update-service \
+            --cluster analytics-cluster \
+            --service  analytics-api-service \
+            --force-new-deployment \
+            --no-cli-pager
+
+  # ---------------------------------------------------------------------------
+  # 6. Wait for stable — confirm all tasks healthy before marking run green
+  # ---------------------------------------------------------------------------
+  wait-stable:
+    name: Wait for stable
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-wait-${{ github.run_id }}
+
+      - name: Wait — ingestion stable
+        run: |
+          aws ecs wait services-stable \
+            --cluster analytics-cluster \
+            --services ingestion-service \
+            --no-cli-pager
+
+      - name: Wait — consumer stable
+        run: |
+          aws ecs wait services-stable \
+            --cluster analytics-cluster \
+            --services consumer-service \
+            --no-cli-pager
+
+      - name: Wait — analytics-api stable
+        run: |
+          aws ecs wait services-stable \
+            --cluster analytics-cluster \
+            --services analytics-api-service \
+            --no-cli-pager

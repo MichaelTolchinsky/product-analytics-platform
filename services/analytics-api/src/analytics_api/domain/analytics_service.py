@@ -2,7 +2,7 @@ from pathlib import Path
 from string import Template
 from typing import Any
 
-from serving.contracts.query_engine import QueryEngine
+from analytics_api.contracts.query_engine import QueryEngine
 
 QUERIES_DIR = Path(__file__).parent.parent / "queries"
 

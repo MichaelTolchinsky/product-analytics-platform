@@ -49,10 +49,10 @@ services:
       floci:
         condition: service_healthy
 
-  serving:
+  analytics-api:
     build:
       context: .
-      dockerfile: services/serving/Dockerfile
+      dockerfile: services/analytics-api/Dockerfile
     ports:
       - "8001:8001"
     environment:

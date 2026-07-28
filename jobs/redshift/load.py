@@ -1,4 +1,4 @@
-"""jobs/load_redshift.py
+"""jobs/redshift/load.py
 
 Loads precomputed gold Parquet files into Redshift Serverless mart tables.
 Runs after each gold job completes (EventBridge chained trigger in production).
@@ -9,11 +9,11 @@ Pattern per metric:
 
 Both statements go through the Redshift Data API (no persistent connection).
 
-Local: skip entirely — DuckDB in the serving API reads gold Parquet directly.
+Local: skip entirely — DuckDB in the analytics-api reads gold Parquet directly.
 
 Usage (manual, after runner_local.py):
-    python jobs/load_redshift.py   # env=local → exits immediately
-    ENV=production python jobs/load_redshift.py
+    python jobs/redshift/load.py   # env=local → exits immediately
+    ENV=production python jobs/redshift/load.py
 """
 
 import asyncio

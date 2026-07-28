@@ -28,7 +28,10 @@ MAX_WAIT_SECONDS = 300
 class RunnerSettings(BaseServiceSettings):
     s3_bucket: str = "analytics-lake"
     athena_database: str = "analytics"
-    athena_output: str = "s3://analytics-lake/athena-results/"
+
+    @property
+    def athena_output(self) -> str:
+        return f"s3://{self.s3_bucket}/athena-results/"
 
 
 # ---------------------------------------------------------------------------

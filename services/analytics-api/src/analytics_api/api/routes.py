@@ -2,14 +2,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 
-from serving.api.schemas import (
+from analytics_api.api.schemas import (
     ConversionResponse,
     DAUResponse,
     EventsResponse,
     SearchesResponse,
     TopPagesResponse,
 )
-from serving.domain.service import MetricsService
+from analytics_api.domain.service import MetricsService
 
 router = APIRouter(prefix="/metrics", tags=["Metrics"])
 

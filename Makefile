@@ -1,4 +1,4 @@
-.PHONY: up down build test lint load-test setup setup-shared setup-ingestion setup-consumer setup-serving setup-load-gen bootstrap jobs-local jobs flush-cache
+.PHONY: up down build test lint load-test setup setup-shared setup-ingestion setup-consumer setup-analytics-api setup-load-gen bootstrap jobs-local jobs flush-cache
 
 ## Local dev
 up:
@@ -11,7 +11,7 @@ up:
 	@until curl -sf http://localhost:8000/docs > /dev/null 2>&1; do sleep 1; done
 	TOTAL_EVENTS=5000 uv run python -m load_gen.runner
 	uv run python jobs/runner_local.py
-	docker compose up serving -d
+	docker compose up analytics-api -d
 
 flush-cache:
 	@echo "Flushing metrics-cache table..."
@@ -31,7 +31,7 @@ bootstrap:
 	uv run python scripts/bootstrap_local.py
 
 ## Install deps locally (for IDE support + running outside Docker)
-setup: setup-shared setup-ingestion setup-consumer setup-serving setup-load-gen
+setup: setup-shared setup-ingestion setup-consumer setup-analytics-api setup-load-gen
 
 setup-shared:
 	uv pip install -e shared/
@@ -42,8 +42,8 @@ setup-ingestion:
 setup-consumer:
 	uv pip install -e services/consumer/
 
-setup-serving:
-	uv pip install -e services/serving/
+setup-analytics-api:
+	uv pip install -e services/analytics-api/
 
 setup-load-gen:
 	uv pip install -e services/load_gen/
