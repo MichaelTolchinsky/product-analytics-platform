@@ -1,4 +1,4 @@
-.PHONY: up down build test lint load-test setup setup-shared setup-ingestion setup-consumer setup-serving setup-load-gen bootstrap jobs-local jobs
+.PHONY: up down build test lint load-test setup setup-shared setup-ingestion setup-consumer setup-serving setup-load-gen bootstrap jobs-local jobs flush-cache
 
 ## Local dev
 up:
@@ -6,7 +6,20 @@ up:
 	@echo "Waiting for Floci to be healthy..."
 	@until docker compose ps floci | grep -q "healthy"; do sleep 1; done
 	uv run python scripts/bootstrap_local.py
-	docker compose up ingestion consumer serving -d
+	docker compose up ingestion consumer -d
+	@echo "Waiting for ingestion to be ready..."
+	@until curl -sf http://localhost:8000/docs > /dev/null 2>&1; do sleep 1; done
+	TOTAL_EVENTS=5000 uv run python -m load_gen.runner
+	uv run python jobs/runner_local.py
+	docker compose up serving -d
+
+flush-cache:
+	@echo "Flushing metrics-cache table..."
+	AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test \
+	  aws --endpoint-url=http://localhost:4566 --region eu-north-1 \
+	  dynamodb delete-table --table-name metrics-cache 2>/dev/null || true
+	@sleep 1
+	uv run python scripts/bootstrap_local.py
 
 down:
 	docker compose down -v

@@ -20,24 +20,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     session = aioboto3.Session()
 
     if settings.env == "local":
-        # Local: DuckDB reads Parquet from Floci S3; DynamoDB cache via Floci
+        # Local: DuckDB reads Parquet from Floci S3; cache disabled (Floci DynamoDB
+        # state survives volume wipes and causes corruption — no latency benefit anyway)
         endpoint = (settings.aws_endpoint_url or "http://localhost:4566").replace("http://", "")
         engine = DuckDBEngine(
             s3_endpoint=endpoint,
             s3_bucket=settings.s3_bucket,
             s3_region=settings.aws_region,
         )
-        async with session.client(
-            "dynamodb",
-            region_name=settings.aws_region,
-            endpoint_url=settings.aws_endpoint_url or "http://localhost:4566",
-        ) as ddb_client:
-            cache = DynamoDBCache(
-                client=ddb_client,
-                table_name=settings.dynamodb_cache_table,
-            )
-            app.state.metrics_service = MetricsService(engine=engine, cache=cache)
-            yield
+        app.state.metrics_service = MetricsService(engine=engine, cache=None)
+        yield
     else:
         # Production: Redshift Serverless (Data API) + DynamoDB cache
         async with (

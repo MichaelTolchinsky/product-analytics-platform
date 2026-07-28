@@ -1,47 +1,164 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Product Analytics</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Daily Active Users</title>
+  <style>
+    :root {
+      --bg: #13151f;
+      --card: #1c1f2e;
+      --border: #2a2f42;
+      --text: #dde1ee;
+      --muted: #6b7390;
+      --blue: #5b8af5;
+      --purple: #9b72f5;
+      --green: #3ecf8e;
+      --orange: #f5a623;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .8rem 1.5rem;
+      background: var(--card); border-bottom: 1px solid var(--border);
+    }
+    header h1 { font-size: .95rem; font-weight: 700; }
+    #ts { font-size: .72rem; color: var(--muted); }
+
+    main { padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+
+    /* KPI row */
+    .kpis { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; }
+    .kpi  {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.1rem 1.3rem;
+    }
+    .kpi .label { font-size: .65rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .4rem; }
+    .kpi .val   { font-size: 2.4rem; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+    .kpi .sub   { font-size: .75rem; color: var(--muted); margin-top: .35rem; }
+
+    /* chart cards */
+    .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .chart-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.1rem 1.3rem;
+    }
+    .chart-card h2 { font-size: .65rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .9rem; }
+
+    /* bar chart */
+    .bar-row { display: flex; align-items: center; gap: .6rem; margin-bottom: .45rem; font-size: .78rem; }
+    .bar-row .name { width: 120px; text-align: right; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+    .bar-row .bar-wrap { flex: 1; background: rgba(255,255,255,.06); border-radius: 4px; height: 18px; }
+    .bar-row .bar-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
+    .bar-row .count { width: 50px; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+    /* vertical bar chart */
+    .vchart { display: flex; align-items: flex-end; gap: .5rem; height: 140px; margin-bottom: .5rem; }
+    .vchart .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .3rem; }
+    .vchart .col .vbar { width: 100%; border-radius: 4px 4px 0 0; transition: height .4s ease; }
+    .vchart .col .vlabel { font-size: .62rem; color: var(--muted); text-align: center; }
+
+    .wide { grid-column: 1/-1; }
+  </style>
 </head>
 <body>
-  <header>
-    <h1>Product Analytics</h1>
-    <span id="last-updated"></span>
-  </header>
+<header>
+  <h1>Daily Active Users</h1>
+  <span id="ts"></span>
+</header>
+<main>
+  <div class="kpis">
+    <div class="kpi">
+      <div class="label">Daily Active Users</div>
+      <div class="val" id="dau-val">—</div>
+      <div class="sub" id="dau-sub"></div>
+    </div>
+    <div class="kpi">
+      <div class="label">Conversion Rate</div>
+      <div class="val" id="cvr-val">—</div>
+      <div class="sub" id="cvr-sub"></div>
+    </div>
+    <div class="kpi">
+      <div class="label">Total Events</div>
+      <div class="val" id="ev-total">—</div>
+      <div class="sub">across all types</div>
+    </div>
+  </div>
 
-  <main>
-    <section class="card" id="dau-card">
-      <h2>Daily Active Users</h2>
-      <p class="metric" id="dau-value">—</p>
-      <p class="sub" id="dau-date"></p>
-    </section>
-
-    <section class="card" id="conversion-card">
-      <h2>Conversion Rate</h2>
-      <p class="metric" id="conversion-rate">—</p>
-      <p class="sub" id="conversion-sub"></p>
-    </section>
-
-    <section class="card wide" id="events-card">
+  <div class="charts">
+    <div class="chart-card">
       <h2>Events by Type</h2>
-      <canvas id="events-chart"></canvas>
-    </section>
-
-    <section class="card wide" id="top-pages-card">
+      <div id="events-chart"></div>
+    </div>
+    <div class="chart-card">
       <h2>Top Pages</h2>
-      <canvas id="top-pages-chart"></canvas>
-    </section>
-
-    <section class="card wide" id="searches-card">
+      <div id="pages-chart"></div>
+    </div>
+    <div class="chart-card wide">
       <h2>Top Searches</h2>
-      <canvas id="searches-chart"></canvas>
-    </section>
-  </main>
+      <div id="searches-chart"></div>
+    </div>
+  </div>
+</main>
+<script>
+const COLORS = ['#5b8af5','#9b72f5','#f472b6','#f5a623','#3ecf8e'];
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <script src="/static/app.js"></script>
+function hbar(items, labelKey, valueKey, color) {
+  const max = Math.max(...items.map(i => i[valueKey]));
+  return items.map((item, idx) => {
+    const pct = max > 0 ? (item[valueKey] / max * 100).toFixed(1) : 0;
+    const c = Array.isArray(color) ? color[idx % color.length] : color;
+    return `<div class="bar-row">
+      <span class="name" title="${item[labelKey]}">${item[labelKey]}</span>
+      <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div>
+      <span class="count">${Number(item[valueKey]).toLocaleString()}</span>
+    </div>`;
+  }).join('');
+}
+
+async function get(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error(r.status + ' ' + path);
+  return r.json();
+}
+
+async function load() {
+  const [dau, cvr, events, pages, searches] = await Promise.allSettled([
+    get('/metrics/dau'), get('/metrics/conversion'),
+    get('/metrics/events'), get('/metrics/top-pages'), get('/metrics/searches')
+  ]).then(rs => rs.map(r => r.status === 'fulfilled' ? r.value : null));
+
+  if (dau) {
+    document.getElementById('dau-val').textContent = Number(dau.dau).toLocaleString();
+    document.getElementById('dau-sub').textContent = dau.date ? 'as of ' + dau.date : '';
+  }
+  if (cvr) {
+    const p = parseFloat(cvr.conversion_rate_pct);
+    document.getElementById('cvr-val').textContent = isNaN(p) ? '—' : p.toFixed(1) + '%';
+    document.getElementById('cvr-sub').textContent =
+      cvr.converted_sessions + ' of ' + cvr.total_signup_sessions + ' signup sessions';
+  }
+  if (events) {
+    const total = events.events.reduce((s,e) => s + Number(e.count), 0);
+    document.getElementById('ev-total').textContent = total.toLocaleString();
+    document.getElementById('events-chart').innerHTML =
+      hbar(events.events, 'event_type', 'count', COLORS);
+  }
+  if (pages) {
+    document.getElementById('pages-chart').innerHTML =
+      hbar(pages.pages, 'page', 'views', '#5b8af5');
+  }
+  if (searches) {
+    document.getElementById('searches-chart').innerHTML =
+      hbar(searches.searches, 'query', 'count', '#9b72f5');
+  }
+
+  document.getElementById('ts').textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+load();
+</script>
 </body>
 </html>

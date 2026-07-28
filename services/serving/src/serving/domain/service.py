@@ -61,10 +61,11 @@ class MetricsService:
             return cached if isinstance(cached, list) else [cached]
 
         rows = await self._engine.run(sql)
-        try:
-            await self._cache.set(key, rows, ttl_seconds=_TTL.get(metric, 60))
-        except Exception:
-            logger.warning("cache write failed for %s — continuing without cache", key)
+        if rows:  # never cache empty results — let next request retry the engine
+            try:
+                await self._cache.set(key, rows, ttl_seconds=_TTL.get(metric, 60))
+            except Exception:
+                logger.warning("cache write failed for %s — continuing without cache", key)
         return rows
 
     async def get_dau(self) -> dict[str, Any]:
